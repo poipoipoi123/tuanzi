@@ -1,0 +1,12 @@
+Godot/
+.godot/
+.tools/
+build/
+shots/
+tests/capture*.tscn
+scripts/core/capture*.gd
+scripts/core/capture_runner.gd
+tests/saveprobe.*
+tests/diag.*
+tests/deep.*
+tests/probe.gd

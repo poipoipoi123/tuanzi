@@ -1,0 +1,45 @@
+; 团子 (Tuanzi) — Godot 客户端工程配置
+; 原创致敬作品，不使用任何第三方版权素材。
+
+config_version=5
+
+[application]
+
+config/name="Tuanzi"
+config/description="Tuanzi - original single-player pet adventure"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.svg"
+boot_splash/bg_color=Color(0.98, 0.94, 0.89, 1)
+boot_splash/show_image=false
+
+[autoload]
+
+InputSetup="*res://scripts/core/input_setup.gd"
+GameState="*res://scripts/core/game_state.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/canvas_textures/default_texture_filter=1
+environment/defaults/default_clear_color=Color(0.85, 0.93, 0.82, 1)
+
+[physics]
+
+common/physics_ticks_per_second=60
+
+[debug]
+
+gdscript/warnings/untyped_declaration=0
+gdscript/warnings/unsafe_property_access=0
+gdscript/warnings/unsafe_method_access=0
