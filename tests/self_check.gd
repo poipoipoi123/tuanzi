@@ -20,6 +20,7 @@ func _ready() -> void:
     _check_growth()
     _check_appearance()
     _check_sfx()
+    await _check_battle_keyboard()
     print("=== 自检结果：%d 通过 / %d 失败 ===" % [_pass, _fail])
     if _fail > 0:
         get_tree().quit(1)
@@ -333,6 +334,59 @@ func _check_sfx() -> void:
     # 注册的 autoload 实例；本轮禁止改 project.godot，故实例由 GameState 持有，
     # 这里断言同一个语义（「音效单例在运行期真实存在且已进节点树」）。
     _ok(is_instance_valid(GameState.sfx()), "Sfx 单例在运行期存在（由 GameState 持有）")
+
+func _check_battle_keyboard() -> void:
+    print("[战斗键盘]")
+    var b: Node2D = load("res://scripts/battle/battle_scene.gd").new()
+    add_child(b)
+    b.setup("water", 3, "grass", 3)
+    await get_tree().process_frame
+    b.state = "choose"
+    b._menu.visible = true
+    b._menu.refresh_for(b.ally)
+    _ok(int(b._menu.cursor) >= 0, "菜单有默认光标")
+    # _menu 在 battle_scene.gd 中声明为 Node（无 class_name），故显式标注类型
+    var first: int = b._menu.cursor
+    b._menu.move_cursor(1)
+    _ok(int(b._menu.cursor) != first, "光标可移动")
+    b._menu.move_cursor(-1)
+    _ok(int(b._menu.cursor) == first, "光标可移回")
+    # 数字键 1 直接选第一个技能
+    b.state = "choose"
+    b._menu.visible = true
+    b._menu.refresh_for(b.ally)
+    b._menu.choose_index(0)
+    _ok(b.state == "act", "数字键确认后进入结算")
+    b.queue_free()
+    await get_tree().process_frame
+
+    # —— resolve_attack 真正接入战斗结算（上一轮遗留项）——
+    print("[结算接入]")
+    var r: Node2D = load("res://scripts/battle/battle_scene.gd").new()
+    add_child(r)
+    r.setup("grass", 3, "water", 3)
+    await get_tree().process_frame
+    # 闪避：命中掷骰为 0，闪避率必然 >= 0.02 → 落空，伤害 0 且血量不变
+    r.foe.data["spd"] = 9999
+    var hp_before := int(r.foe.data["hp"])
+    var sk: Dictionary = SkillDB.get_skill("tackle")
+    var miss: Dictionary = Battler.resolve_attack(
+        r.ally.data, r.foe.data, sk, 0.5, 0.0, 0.0)
+    _ok(not bool(miss["hit"]) and int(miss["damage"]) == 0, "闪避时伤害为 0")
+    var applied_miss: int = r._apply_attack(0, sk, 0.5, 0.0, 0.0)
+    _ok(applied_miss == 0 and int(r.foe.data["hp"]) == hp_before,
+        "闪避不扣血（damage=0，血量不变）")
+    # 暴击：crit_roll=0 必暴击，且伤害高于同 rng 的非暴击
+    r.foe.data["spd"] = 1
+    var hp2 := int(r.foe.data["hp"])
+    var crit_dmg: int = r._apply_attack(0, sk, 0.5, 1.0, 0.0)
+    var hp3 := int(r.foe.data["hp"])
+    _ok(crit_dmg > 0 and hp2 - hp3 == crit_dmg, "暴击伤害真实扣血（%d）" % crit_dmg)
+    var nocrit_dmg: int = r._apply_attack(0, sk, 0.5, 1.0, 1.0)
+    _ok(crit_dmg > nocrit_dmg, "暴击伤害高于同 rng 非暴击（%d > %d）" % [crit_dmg, nocrit_dmg])
+    r.queue_free()
+    await get_tree().process_frame
+
 
 
 

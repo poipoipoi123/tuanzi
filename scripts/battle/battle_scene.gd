@@ -223,6 +223,23 @@ func _on_capture_attempt(item_id: String) -> void:
         state = "act"
         _timer = 0.75
 
+## 键盘操作：左右移动光标、E/空格确认、数字键 1-4 直选。
+func _unhandled_input(e: InputEvent) -> void:
+    if _menu == null or not _menu.visible:
+        return
+    if e.is_action_pressed("move_left"):
+        _menu.move_cursor(-1)
+    elif e.is_action_pressed("move_right"):
+        _menu.move_cursor(1)
+    elif e.is_action_pressed("interact"):
+        _menu.choose_index(_menu.cursor)
+    else:
+        for i in 4:
+            if e is InputEventKey and (e as InputEventKey).pressed                     and (e as InputEventKey).keycode == KEY_1 + i:
+                _menu.choose_index(i)
+                break
+    get_viewport().set_input_as_handled()
+
 ## 找出背包里第一个指定类型的可用道具 id。
 func _first_item_of_type(t: String) -> String:
     for iid in GameState.inventory.keys():
@@ -279,14 +296,37 @@ func _apply(side: int, sk: Dictionary) -> void:
         GameState.play_sfx("heal")
         return
 
-    var dmg := Battler.compute_damage(actor.data, target.data, sk, _rng.randf())
+    _apply_attack(side, sk, _rng.randf(), _rng.randf(), _rng.randf())
+
+## 一次攻击的完整结算：命中/闪避 -> 伤害 -> 暴击。
+## rng_value / hit_roll / crit_roll 三个随机数分开传入，便于确定性测试。
+## 返回实际扣掉的血量（闪避时为 0）。
+func _apply_attack(side: int, sk: Dictionary, rng_value: float,
+        hit_roll: float, crit_roll: float) -> int:
+    var actor: Battler = ally if side == 0 else foe
+    var target: Battler = foe if side == 0 else ally
+    var t_anim: Dictionary = _foe_anim if side == 0 else _ally_anim
+    var res: Dictionary = Battler.resolve_attack(
+        actor.data, target.data, sk, rng_value, hit_roll, crit_roll)
+    if not bool(res["hit"]):
+        _push_log("%s 躲开了 %s 的攻击。" % [target.data["name"], sk["name"]])
+        _add_floater(1 - side, "落空", Palette.INK_SOFT)
+        return 0
+    var dmg := int(res["damage"])
     target.take_damage(dmg)
     t_anim["hurt"] = 1.0
     t_anim["bob"] = -10.0
     _shake = 7.0 if side == 0 else 5.0
     _flash = 0.5 if side == 0 else 0.0
-    _push_log("%s 使用了 %s，造成 %d 点伤害。" % [actor.data["name"], sk["name"], dmg])
-    _add_floater(1 - side, "-%d" % dmg, Palette.HP_RED)
+    if bool(res["crit"]):
+        GameState.play_sfx("crit")
+        _push_log("%s 使用了 %s，暴击！造成 %d 点伤害。" % [actor.data["name"], sk["name"], dmg])
+        _add_floater(1 - side, "暴击 -%d" % dmg, Palette.PINK_DEEP)
+    else:
+        GameState.play_sfx("hit")
+        _push_log("%s 使用了 %s，造成 %d 点伤害。" % [actor.data["name"], sk["name"], dmg])
+        _add_floater(1 - side, "-%d" % dmg, Palette.HP_RED)
+    return dmg
 
 func _add_floater(target_side: int, text: String, color: Color) -> void:
     var base := FOE_ORIGIN if target_side == 1 else ALLY_ORIGIN

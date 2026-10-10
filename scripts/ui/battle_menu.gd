@@ -7,6 +7,10 @@ signal capture_requested()
 signal flee_chosen()
 
 var _hb: HBoxContainer
+var cursor := 0
+var _entries: Array = []       # [{ id, kind }]，kind: "skill" | "item" | "capture" | "flee"
+
+const CURSOR_PREFIX := "▶ "
 
 func _ready() -> void:
     set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -35,16 +39,60 @@ func _ready() -> void:
 ## 依据出战伙伴的技能表重建按钮。
 func refresh_for(battler: Battler) -> void:
     for c in _hb.get_children():
+        _hb.remove_child(c)
         c.queue_free()
+    _entries.clear()
+    cursor = 0
     var ids: Array = battler.skill_ids()
     for sid in ids:
         var sk: Dictionary = SkillDB.get_skill(String(sid))
+        _entries.append({ "id": String(sid), "kind": "skill" })
         _hb.add_child(_make_button(
             "%s\n威力 %d" % [sk["name"], int(sk.get("power", 0))],
             Palette.PINK_DEEP, func(): skill_chosen.emit(String(sid))))
+    _entries.append({ "id": "", "kind": "item" })
     _hb.add_child(_make_button("道具", Palette.MINT.darkened(0.3), func(): item_menu_requested.emit()))
+    _entries.append({ "id": "", "kind": "capture" })
     _hb.add_child(_make_button("收服", Palette.SKY.darkened(0.2), func(): capture_requested.emit()))
+    _entries.append({ "id": "", "kind": "flee" })
     _hb.add_child(_make_button("逃跑", Palette.INK_SOFT, func(): flee_chosen.emit()))
+    _apply_cursor()
+
+## 键盘左右移动光标（环绕）。
+func move_cursor(delta: int) -> void:
+    if _entries.is_empty():
+        return
+    cursor = wrapi(cursor + delta, 0, _entries.size())
+    _apply_cursor()
+
+## 数字键 / 确认键按下：直接选定第 i 项。
+func choose_index(i: int) -> void:
+    if i < 0 or i >= _entries.size():
+        return
+    cursor = i
+    _activate()
+
+func _activate() -> void:
+    var e: Dictionary = _entries[cursor]
+    match String(e["kind"]):
+        "skill":   skill_chosen.emit(String(e["id"]))
+        "item":    item_menu_requested.emit()
+        "capture": capture_requested.emit()
+        "flee":    flee_chosen.emit()
+
+func _apply_cursor() -> void:
+    var btns := _hb.get_children()
+    for i in btns.size():
+        var b := btns[i] as Button
+        if b == null:
+            continue
+        var base := String(b.get_meta("base_text", b.text))
+        b.text = (CURSOR_PREFIX + base) if i == cursor else base
+        b.add_theme_color_override("font_color",
+            Palette.PINK_DEEP if i == cursor else Palette.INK)
+
+func has_focus_inkey() -> bool:
+    return true
 
 func _make_button(text: String, edge: Color, cb: Callable) -> Button:
     var b := Button.new()
@@ -65,5 +113,7 @@ func _make_button(text: String, edge: Color, cb: Callable) -> Button:
     bh.bg_color = Palette.PINK.lightened(0.40)
     b.add_theme_stylebox_override("hover", bh)
     b.add_theme_stylebox_override("pressed", bh)
-    b.pressed.connect(cb)
+    b.set_meta("base_text", text)
+    var idx := _hb.get_child_count()
+    b.pressed.connect(func(): cursor = idx; cb.call())
     return b
