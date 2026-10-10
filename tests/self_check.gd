@@ -10,6 +10,7 @@ func _ready() -> void:
     await get_tree().process_frame
     _check_data()
     _check_elements()
+    _check_capture()
     _check_state()
     _check_battle_math()
     _check_turn_order()
@@ -50,6 +51,22 @@ func _check_elements() -> void:
     _ok(ElementDB.effectiveness("草", "草") == 1.0, "同属性 1 倍")
     _ok(ElementDB.effectiveness("星", "草") == 2.0, "星打草 2 倍")
     _ok(ElementDB.effectiveness("__未知__", "草") == 1.0, "未知属性回退 1 倍")
+
+func _check_capture() -> void:
+    print("[收服]")
+    _ok(Capture.rate(1.0, 1, 1.0) >= 0.05, "残血目标收服率有下限")
+    var full := Capture.rate(1.0, 1, 1.0)
+    var low := Capture.rate(0.1, 1, 1.0)
+    _ok(low > full, "血量越低越容易收服（%.2f > %.2f）" % [low, full])
+    # 注意：这里用 level_gap_bonus=0.0 且较高的血量，避免双方都被 MAX_RATE 截断而无法区分道具档次
+    var weak_ball := Capture.rate(0.9, 1, 0.0)
+    var strong_ball := Capture.rate(0.9, 3, 0.0)
+    _ok(strong_ball > weak_ball, "高级捕捉道具成功率更高（%.2f > %.2f）" % [strong_ball, weak_ball])
+    _ok(Capture.rate(0.01, 9, 0.0) <= 0.98, "收服率上限不超过 0.98")
+    _ok(Capture.rate(1.0, 1, 1.0) <= 0.95, "满血目标也有上限")
+    var ball: Dictionary = ItemDB.get_item("capture_ball")
+    _ok(not ball.is_empty(), "捕捉道具存在于道具表")
+    _ok(int(ball["power"]) == 1, "基础捕捉道具威力为 1")
 
 func _check_state() -> void:
     print("[存档]")
