@@ -48,3 +48,33 @@
       仍应 `=== 自检结果：137 通过 / 0 失败 ===` 且 `ALL PASS`；改回文件名后同样全绿
 - [ ] 贴图存在时团子兽 / NPC / 场景装饰显示为贴图；删除 `assets/sprites/` 下贴图后显示为程序化绘制
 - [ ] `build/Tuanzi.exe` 导出成功并可启动，无报错
+
+## 阶段二素材补充 · 门禁实测结果（自动执行日期 2026-06-14）
+
+以下为命令行自动核验的结论，人眼项见上方列表：
+
+| 检查项 | 命令/方法 | 结果 |
+|---|---|---|
+| 贴图最近邻采样 | `project.godot` `textures/canvas_textures/default_texture_filter=0` | 已生效（`project.godot:35`） |
+| tileset 与代码契约一致 | Node 手写 PNG 解码逐格采样 | 128x16 单行 8 格，顺序 = `WorldArt.TILE_NAMES` 全部命中 |
+| 自检全绿 | `--headless --path . res://tests/self_check.tscn --quit-after 900` | `=== 自检结果：137 通过 / 0 失败 ===` + `ALL PASS`，退出码 0 |
+| stderr 洁净 | 合并 stdout+stderr 后 grep | 无 `SCRIPT ERROR` / `Parse Error` / `Compile Error` |
+| 缺图优雅回退 | 临时改名 `assets/tiles/tileset.png` 后重跑自检 | 仍 137/0 + `ALL PASS`，退出码 0 |
+| 导出并启动 | `--headless --export-release "Windows Desktop" build/Tuanzi.exe` | 导出 111,583,296 字节；启动后存活 12 秒，无报错输出 |
+| 素材许可 | 逐包读取 `License.txt` + 逐页核对 OpenGameArt 许可区块 | Kenney 10 包全 CC0 1.0；OpenGameArt 12 项全 CC0 1.0；无 SA/NC/ND/OGA-BY |
+| 打包体积 | `assets/_originals`、`_source_pages`、`_pages` 内放 `.gdignore` | 归档 4.78 MB 不进包；运行期 `sprites/`+`tiles/`+`ui/` 共 2.21 MB / 2446 文件 |
+
+### 仍需人眼确认（无法自动化）
+
+- [ ] 实战中对同一只敌人连续攻击 20 次，能观察到暴击（约 1.6 倍）与「落空」两种飘字
+- [ ] 弱火属性打草属性目标时伤害明显偏低（反克制方向同样成立）
+- [ ] 把 `assets/sprites/` 整个目录临时改名后，世界与战斗画面退回程序化绘制且**不崩溃**
+- [ ] 用团子球投掷野生团子兽，血量越低成功率越高，失败时有明确日志
+- [ ] 音效音量不过响，连续触发多个音效不叠加爆音
+
+### 本阶段未覆盖（明确不在范围内）
+
+- 敌方 AI 团子兽不会主动使用属性招式，也不存在「异常状态」（灼烧/中毒/麻痹）
+- 收服失败仅有日志，无「挣脱」动画
+- 音效为运行时程序化合成（无音频文件），音色为方波/锯齿/三角波近似，非真实录音
+- 未做移动端/手柄适配，未做多语言
