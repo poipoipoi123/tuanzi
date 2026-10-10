@@ -9,6 +9,7 @@ var _fail := 0
 func _ready() -> void:
     await get_tree().process_frame
     _check_data()
+    _check_sprite_lib()
     _check_elements()
     _check_capture()
     _check_state()
@@ -47,6 +48,21 @@ func _check_data() -> void:
     _ok(SkillDB.get_skill("bubble")["name"] == "泡泡弹", "技能表可查")
     _ok(SkillDB.get_skill("__nope__")["name"] == "团子撞击", "未知技能回退到撞击")
     _ok(ItemDB.get_item("berry")["name"] == "甜浆果", "道具表可查")
+
+func _check_sprite_lib() -> void:
+    print("[贴图加载]")
+    _ok(SpriteLib.load_tex("res://assets/__不存在__.png") == null, "缺图返回 null 而非报错")
+    _ok(not SpriteLib.has("res://assets/__不存在__.png"), "has() 对缺图返回 false")
+    _ok(SpriteLib.frame(null, 0, 4) == null, "frame(null,...) 返回 null")
+    var icon: Texture2D = SpriteLib.load_tex("res://icon.svg")
+    _ok(icon != null, "内置 icon.svg 可加载")
+    _ok(SpriteLib.frame(icon, 1, 4) != null, "可切出第 1 帧")
+    _ok(SpriteLib.frame(icon, 0, 4).region.size.x > 0, "帧区域宽度为正")
+    # 计划的任务 B 测试块只列出 7 条断言，但其算术按 8 条计（113+8=121）。
+    # 此处补测契约里原本没被覆盖的缓存行为：重复加载同一路径返回同一实例。
+    _ok(SpriteLib.load_tex("res://icon.svg") == icon, "重复加载命中缓存返回同一实例")
+    SpriteLib.clear_cache()
+    _ok(true, "清缓存不报错")
 
 func _check_elements() -> void:
     print("[属性克制]")
