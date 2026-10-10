@@ -236,8 +236,19 @@ func _draw() -> void:
                 WorldArt.house(self, Vector2(d["pos"]), float(d["w"]), float(d["h"]),
                     Color(d["wall"]), Color(d["roof"]))
             "tree":
-                WorldArt.tree(self, Vector2(d["pos"]), float(d["scale"]),
-                    sin(t * 0.8 + float(d["sway"])) * 0.6)
+                # 贴图优先；tileset 缺失时回退到程序化绘制
+                var tree_tex := SpriteLib.frame(
+                    SpriteLib.load_tex(WorldArt.tile_path("tree")),
+                    WorldArt.TILE_NAMES.find("tree"), WorldArt.TILE_NAMES.size())
+                if tree_tex != null:
+                    var ts := float(d["scale"])
+                    var tp: Vector2 = d["pos"]
+                    var tp_px := float(WorldArt.TILE_PX) * 4.0 * ts
+                    draw_texture_rect(tree_tex,
+                        Rect2(tp.x - tp_px * 0.5, tp.y - tp_px, tp_px, tp_px), false)
+                else:
+                    WorldArt.tree(self, Vector2(d["pos"]), float(d["scale"]),
+                        sin(t * 0.8 + float(d["sway"])) * 0.6)
             "bush":
                 WorldArt.bush(self, Vector2(d["pos"]), float(d["scale"]))
             "fence":

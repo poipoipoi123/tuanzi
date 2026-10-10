@@ -1,6 +1,22 @@
 class_name WorldArt
 extends RefCounted
-## 场景装饰绘制库：草地、树木、池塘、房屋、栅栏、路灯。全部程序化。
+## 场景装饰绘制库：草地、树木、池塘、房屋、栅栏、路灯。
+## 优先使用 tileset 贴图；贴图缺失时回退到程序化绘制。
+
+const TILE_PX := 16
+const TILE_NAMES := ["grass", "path", "water", "house", "tree", "stone", "fence", "lamp"]
+const TILESET := "res://assets/tiles/tileset.png"
+
+static func tile_path(_name: String) -> String:
+    return TILESET
+
+## 返回当前缺失的瓦片名列表（空数组表示素材齐备）。
+static func missing_tiles() -> Array:
+    var out: Array = []
+    for n in TILE_NAMES:
+        if SpriteLib.load_tex(tile_path(n)) == null:
+            out.append(n)
+    return out
 
 static func grass_tuft(canvas: CanvasItem, base: Vector2, h: float, tint: float) -> void:
     var c := Palette.GRASS_DARK.lerp(Palette.LEAF, clampf(tint, 0.0, 1.0))

@@ -11,6 +11,7 @@ func _ready() -> void:
     _check_data()
     _check_sprite_lib()
     _check_sprite_art()
+    _check_world_art_tiles()
     _check_elements()
     _check_capture()
     _check_state()
@@ -78,6 +79,15 @@ func _check_sprite_art() -> void:
     # 此处补测未知 id 的路径回退契约：必须落到缺失占位图而不是空串。
     _ok(TuanziArt.sprite_path_for("__不存在__") ==
         "res://assets/sprites/tuanzi_missing.png", "未知 id 回退到缺失占位路径")
+
+func _check_world_art_tiles() -> void:
+    print("[场景贴图]")
+    _ok(WorldArt.TILE_PX == 16, "瓦片基准尺寸为 16px")
+    for k in WorldArt.TILE_NAMES:
+        _ok(String(k).length() > 0, "瓦片名 %s 非空" % k)
+    var missing := WorldArt.missing_tiles()
+    _ok(missing is Array, "missing_tiles 返回数组")
+    _ok(WorldArt.tile_path("grass") != "", "grass 有路径定义")
 
 func _check_elements() -> void:
     print("[属性克制]")
