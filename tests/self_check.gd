@@ -94,6 +94,40 @@ func _check_battle_math() -> void:
     bt.data["hp"] = 1
     bt.heal(99999)
     _ok(int(bt.data["hp"]) == int(bt.data["max_hp"]), "治疗不溢出上限")
+    # 克制：草打水应显著高于水打草
+    var grass_atk: Dictionary = PetDB.make_battler("grass", 5)
+    var water_def: Dictionary = PetDB.make_battler("water", 5)
+    var water_atk: Dictionary = PetDB.make_battler("water", 5)
+    var tackle: Dictionary = SkillDB.get_skill("tackle")
+    var strong_dmg := 0
+    var weak_dmg := 0
+    for i in 100:
+        strong_dmg += Battler.compute_damage(grass_atk, water_def, tackle, 0.5)
+        weak_dmg += Battler.compute_damage(water_atk, grass_atk, tackle, 0.5)
+    _ok(strong_dmg > weak_dmg * 2, "克制伤害显著高于被抗伤害（%d vs %d）" % [strong_dmg, weak_dmg])
+
+    # 必中判定：rng=1.0 必定命中
+    var hit_result: Dictionary = Battler.resolve_attack(
+        grass_atk, water_def, tackle, 0.5, 1.0, 0.0)
+    _ok(bool(hit_result["hit"]), "rng=1.0 时必定命中")
+    _ok(int(hit_result["damage"]) > 0, "命中时伤害为正")
+
+    # 必闪判定：rng=0.0 且闪避率极高时必定落空
+    var dodgy: Dictionary = water_def.duplicate(true)
+    dodgy["spd"] = 9999
+    var miss_result: Dictionary = Battler.resolve_attack(
+        grass_atk, dodgy, tackle, 0.5, 0.0, 0.0)
+    _ok(not bool(miss_result["hit"]), "高闪避目标可躲开攻击")
+    _ok(int(miss_result["damage"]) == 0, "落空时不造成伤害")
+
+    # 暴击：crit_roll=0.0 必暴击，伤害应高于不暴击
+    var crit: Dictionary = Battler.resolve_attack(
+        grass_atk, water_def, tackle, 0.5, 1.0, 0.0)
+    var nocrit: Dictionary = Battler.resolve_attack(
+        grass_atk, water_def, tackle, 0.5, 1.0, 1.0)
+    _ok(bool(crit["crit"]), "crit_roll=0.0 时触发暴击")
+    _ok(not bool(nocrit["crit"]), "crit_roll=1.0 时不暴击")
+    _ok(int(crit["damage"]) > int(nocrit["damage"]), "暴击伤害高于普通伤害")
 
 func _check_turn_order() -> void:
     print("[出手顺序]")
