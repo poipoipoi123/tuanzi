@@ -181,6 +181,7 @@ func _on_item_used(item_id: String) -> void:
             var h := ally.heal(int(it["power"]))
             _push_log("使用 %s，%s 恢复了 %d 点体力。" % [it["name"], ally.data["name"], h])
             _add_floater(0, "+%d" % h, Palette.HP_GREEN)
+            GameState.play_sfx("heal")
         "buff":
             ally.data["atk"] = int(ally.data["atk"]) + int(it["power"])
             _push_log("使用 %s，攻击提升 %d 点。" % [it["name"], int(it["power"])])
@@ -203,6 +204,7 @@ func _on_capture_attempt(item_id: String) -> void:
     var ball_power := int(it.get("power", 1))
     var gap := float(ally.data["level"]) - float(foe.data["level"])
     var ok := Capture.attempt(foe.hp_ratio(), ball_power, maxf(0.0, gap) * 0.05, _rng.randf())
+    GameState.play_sfx("capture")
     if ok:
         _push_log("成功收服了 %s！" % foe.data["name"])
         var pid := String(foe.data["id"])
@@ -274,6 +276,7 @@ func _apply(side: int, sk: Dictionary) -> void:
         var h := actor.heal(int(sk["power"]))
         _push_log("%s 使用了 %s，恢复 %d 点体力。" % [actor.data["name"], sk["name"], h])
         _add_floater(side, "+%d" % h, Palette.HP_GREEN)
+        GameState.play_sfx("heal")
         return
 
     var dmg := Battler.compute_damage(actor.data, target.data, sk, _rng.randf())
@@ -292,6 +295,7 @@ func _add_floater(target_side: int, text: String, color: Color) -> void:
 
 func _finish() -> void:
     if not foe.is_alive():
+        GameState.play_sfx("win")
         _result = "win"
         var exp_gain := 12 + int(foe.data["level"]) * 7
         var coin_gain := 10 + int(foe.data["level"]) * 4
@@ -301,6 +305,7 @@ func _finish() -> void:
         _push_log("%s 倒下了！获得 %d 经验、%d 团子币。" % [
             foe.data["name"], exp_gain, coin_gain])
     elif not ally.is_alive():
+        GameState.play_sfx("lose")
         _result = "lose"
         _push_log("小团子失去了战斗能力……")
     else:

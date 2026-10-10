@@ -19,6 +19,7 @@ func _ready() -> void:
     await _check_battle_items()
     _check_growth()
     _check_appearance()
+    _check_sfx()
     print("=== 自检结果：%d 通过 / %d 失败 ===" % [_pass, _fail])
     if _fail > 0:
         get_tree().quit(1)
@@ -318,5 +319,20 @@ func _check_appearance() -> void:
     GameState.new_game()
     _ok(GameState.load_game(), "存档含外观可读回")
     _ok(String(GameState.appearance["preset"]) == "mint", "读档还原外观预设")
+
+func _check_sfx() -> void:
+    print("[音效]")
+    _ok(Sfx.tone_bytes("blip", 0.15, 660.0) > 100, "生成了非空 PCM 数据")
+    var a: PackedByteArray = Sfx.build_pcm(0.1, 440.0, 0.5)
+    var b: PackedByteArray = Sfx.build_pcm(0.1, 880.0, 0.5)
+    _ok(a.size() == b.size(), "同一时长产生同样长度的数据")
+    _ok(a != b, "不同频率产生不同波形")
+    _ok(Sfx.build_pcm(0.1, 440.0, 0.0).size() > 0, "零音量仍返回有效缓冲")
+    _ok(Sfx.KINDS.has("hit") and Sfx.KINDS.has("win"), "定义了命中与胜利音效")
+    # 偏离计划原断言：计划用 `is_instance_valid(Sfx)`，前提是 Sfx 是 project.godot 里
+    # 注册的 autoload 实例；本轮禁止改 project.godot，故实例由 GameState 持有，
+    # 这里断言同一个语义（「音效单例在运行期真实存在且已进节点树」）。
+    _ok(is_instance_valid(GameState.sfx()), "Sfx 单例在运行期存在（由 GameState 持有）")
+
 
 

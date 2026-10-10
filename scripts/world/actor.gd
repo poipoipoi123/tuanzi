@@ -76,3 +76,7 @@ func _draw() -> void:
 
 func get_radius() -> float:
     return 26.0
+
+## 当前是否正在移动（供脚步声等外部逻辑只读查询）。
+func is_moving() -> bool:
+    return _moving

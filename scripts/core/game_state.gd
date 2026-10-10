@@ -40,8 +40,24 @@ var flags := {}                 # 剧情开关
 var appearance := { "preset": "classic" }   # 外观：{ preset: 预设 id }
 var play_seconds := 0.0
 
+## 程序化音效单例（Sfx 是全局 class_name，但播放需要真实节点树）。
+## 偏离说明：阶段二计划任务 7 要求在 project.godot 的 [autoload] 段注册
+## `Sfx="*res://scripts/core/sfx.gd"`；本轮工作约束禁止修改 project.godot，
+## 因此改由已有的 autoload（GameState 本身）实例化并持有唯一实例，
+## 运行期与自检里 `is_instance_valid(Sfx)` 同样成立，且仍无任何音频文件。
+## 成员名刻意不叫 Sfx：会遮蔽全局类 Sfx，导致 `Sfx.new()` 解析为 Nil。
+var _sfx: Sfx = null
+
+## 程序化音效单例入口（无实例时返回 null，便于无头测试直接取静态方法）。
+func sfx() -> Sfx:
+    return _sfx
+
 func _ready() -> void:
     randomize()
+    if _sfx == null or not is_instance_valid(_sfx):
+        _sfx = Sfx.new()
+        _sfx.name = "Sfx"
+        add_child(_sfx)
     if pet_state.is_empty():
         _ensure_pet_state()
 
@@ -102,6 +118,11 @@ func _apply_derived() -> void:
     if new_max != int(player["max_hp"]):
         player["max_hp"] = new_max
         player["hp"] = mini(int(player["hp"]), new_max)
+
+## 播放程序化音效（未初始化时静默忽略，便于纯逻辑测试）。
+func play_sfx(kind: String) -> void:
+    if _sfx != null and is_instance_valid(_sfx):
+        _sfx.play(kind)
 
 func set_appearance(preset: String) -> bool:
     if not APPEARANCE_PRESETS.has(preset):

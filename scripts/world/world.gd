@@ -15,6 +15,7 @@ var _obstacles := []            # 阻挡椭圆 { center: Vector2, radii: Vector2
 var _npc_bubble: Node = null
 var _journal: CanvasLayer = null
 var _appearance: CanvasLayer = null
+var _step_cd := 0.0
 
 func _ready() -> void:
     _build_decor()
@@ -172,6 +173,11 @@ func _process(delta: float) -> void:
         player.position = p
         camera.global_position = camera.global_position.lerp(p, clampf(delta * 7.0, 0, 1))
         _clamp_camera()
+        # 移动脚步声：每 0.36 秒一次
+        _step_cd -= delta
+        if player.is_moving() and _step_cd <= 0.0:
+            _step_cd = 0.36
+            GameState.play_sfx("step")
     _lamp_glow = 0.55 + sin(Time.get_ticks_msec() / 900.0) * 0.45
     queue_redraw()
 
@@ -276,6 +282,7 @@ func _show_bubble(world_pos: Vector2, text: String) -> void:
     _npc_bubble.position = world_pos + Vector2(0, -104)
     _npc_bubble.setup(text)
     add_child(_npc_bubble)
+    GameState.play_sfx("blip")
 
 ## 装饰排序：无 pos 的（栅栏）按两端点 y 的较大值参与排序。
 func _deco_less(a: Dictionary, b: Dictionary) -> bool:
