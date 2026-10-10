@@ -11,12 +11,12 @@ var npcs: Array = []
 var _deco_static := []      # 静态装饰（树/房/栅栏）配置；_build_decor 后转为 _deco_nodes
 var _deco_nodes: Array = []   # 对应的 WorldDeco 子节点（参与 y-sort）
 var _grass_tufts := []
-var _lamp_glow := 0.0
 var _obstacles := []            # 阻挡椭圆 { center: Vector2, radii: Vector2 }
 var _npc_bubble: Node = null
 var _journal: CanvasLayer = null
 var _appearance: CanvasLayer = null
 var _step_cd := 0.0
+var _ground: Sprite2D = null
 
 func _ready() -> void:
     # y-sort：让树/房/栅栏与 player、NPC 按 y 正确前后遮挡。
@@ -24,6 +24,7 @@ func _ready() -> void:
     # 手绘的普通数组（_deco_static），永远先于子节点绘制 —— 角色会
     # 从树后面直接穿过去显示。开启 y_sort 后装饰需改为真实子节点。
     y_sort_enabled = true
+    _build_ground()
     _build_decor()
     _spawn_player()
     _spawn_npcs()
@@ -35,8 +36,28 @@ func world_rect() -> Rect2:
 
 # —— 场景搭建 ——
 
+## 地面底图：tools/gen_ground.py 用 Kenney 瓦片预合成的整张地图。
+## 作为一个 Sprite2D 挂在最底层（z_index = -2000），角色与装饰都画在它上面。
+func _build_ground() -> void:
+    var tex := WorldArt.ground_texture()
+    if tex == null:
+        push_warning("地面底图缺失：%s（先跑 python tools/gen_ground.py）" % WorldArt.GROUND_IMAGE)
+        return
+    var spr := Sprite2D.new()
+    spr.name = "Ground"
+    spr.texture = tex
+    spr.centered = false
+    spr.z_index = -2000
+    spr.y_sort_enabled = false
+    # 像素风必须最近邻，否则底图会被插值糊掉。
+    spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+    add_child(spr)
+    _ground = spr
+    queue_redraw()
+
+
 func _build_decor() -> void:
-    # 随机草簇（固定种子保证每次一致）
+    # 草簇：固定种子保证每次一致。数量被自检断言为 220，别改。
     var rng := RandomNumberGenerator.new()
     rng.seed = 20261010
     for i in 220:
@@ -47,23 +68,21 @@ func _build_decor() -> void:
             "tint": rng.randf(),
             "sway": rng.randf() * TAU,
         })
-    # 房屋
-    _deco_static.append({ "kind": "house", "pos": Vector2(420, 430), "w": 190.0, "h": 130.0,
-        "wall": Palette.WALL, "roof": Palette.ROOF })
-    _deco_static.append({ "kind": "house", "pos": Vector2(700, 360), "w": 150.0, "h": 110.0,
-        "wall": Palette.WALL_DEEP, "roof": Palette.ROOF_DEEP })
-    _deco_static.append({ "kind": "house", "pos": Vector2(1780, 520), "w": 200.0, "h": 140.0,
-        "wall": Palette.WALL, "roof": Palette.PINK_DEEP })
-    # 池塘
+    # 房屋：5 格宽 x 3 格高的 tiny_town 拼图（屋顶排 / 墙体排 / 带门地基排）
+    _deco_static.append({ "kind": "house", "pos": Vector2(420, 430), "variant": 0 })
+    _deco_static.append({ "kind": "house", "pos": Vector2(700, 360), "variant": 1 })
+    _deco_static.append({ "kind": "house", "pos": Vector2(1780, 520), "variant": 2 })
+    # 池塘：地面已经画进 ground_base.png，这里只留一条记录占位，
+    # WorldDeco 对 kind == "pond" 是 no-op。
     _deco_static.append({ "kind": "pond", "pos": Vector2(1180, 900),
         "rx": 170.0, "ry": 96.0 })
     # 水面不可涉入（收窄一点，让边缘看起来是岸）
     _obstacles.append({ "center": Vector2(1180, 900), "radii": Vector2(158.0, 84.0) })
     # 房屋占位
-    _obstacles.append({ "center": Vector2(420, 430), "radii": Vector2(100.0, 70.0) })
-    _obstacles.append({ "center": Vector2(700, 360), "radii": Vector2(80.0, 58.0) })
-    _obstacles.append({ "center": Vector2(1780, 520), "radii": Vector2(105.0, 74.0) })
-    # 树
+    _obstacles.append({ "center": Vector2(420, 430), "radii": Vector2(80.0, 48.0) })
+    _obstacles.append({ "center": Vector2(700, 360), "radii": Vector2(80.0, 48.0) })
+    _obstacles.append({ "center": Vector2(1780, 520), "radii": Vector2(80.0, 48.0) })
+    # 树：variant 决定用哪一组树冠+树干（0 绿松 / 1 黄松 / 2 圆蓬 / 3 窄蓬 / 4 双叶）
     var tree_spots := [
         Vector2(180, 300), Vector2(250, 780), Vector2(560, 1150), Vector2(980, 320),
         Vector2(1500, 260), Vector2(2050, 980), Vector2(2200, 380), Vector2(1330, 1330),
@@ -71,14 +90,14 @@ func _build_decor() -> void:
     ]
     for i in tree_spots.size():
         _deco_static.append({ "kind": "tree", "pos": tree_spots[i],
-            "scale": 0.85 + float(i % 4) * 0.13, "sway": float(i) })
-    # 灌木
+            "variant": i % WorldArt.TREE_PAIRS.size(), "sway": float(i) })
+    # 灌木：灌木(17) / 石头(43) / 花(2) / 草簇(1) 四种轮流
     var bush_spots := [Vector2(880, 720), Vector2(1420, 700), Vector2(640, 900),
         Vector2(1700, 880), Vector2(1080, 1180), Vector2(2050, 700)]
     for i in bush_spots.size():
         _deco_static.append({ "kind": "bush", "pos": bush_spots[i],
-            "scale": 0.9 + float(i % 3) * 0.15 })
-    # 路灯
+            "variant": i })
+    # 路灯（95 号火焰灯柱）
     for p in [Vector2(620, 620), Vector2(1000, 640), Vector2(1560, 620), Vector2(1960, 760)]:
         _deco_static.append({ "kind": "lamp", "pos": p })
     # 栅栏（围出一片花圃）
@@ -90,9 +109,6 @@ func _build_decor() -> void:
     # 装饰必须成为真实子节点才能参与 y-sort（见 WorldDeco 顶部说明）。
     _spawn_deco_nodes()
 
-## 把 _deco_static 里的每一项实例化成 WorldDeco 子节点。
-## world 自身只保留地面、小径与草簇（地面永远在最底，装饰与角色的前后关系
-## 完全交给 y_sort 处理）。
 func _spawn_deco_nodes() -> void:
     # _deco_static 保留为配置来源（自检会断言装饰数量），不再被清空。
     for i in _deco_static.size():
@@ -214,8 +230,7 @@ func _process(delta: float) -> void:
         if player.is_moving() and _step_cd <= 0.0:
             _step_cd = 0.36
             GameState.play_sfx("step")
-    _lamp_glow = 0.55 + sin(Time.get_ticks_msec() / 900.0) * 0.45
-    queue_redraw()
+    # 地面是静态贴图、装饰各自 queue_redraw，这里不需要再整体重绘。
 
 func _clamp_camera() -> void:
     if camera == null:
@@ -236,37 +251,11 @@ func _clamp_camera() -> void:
 # —— 绘制 ——
 
 func _draw() -> void:
-    # 地面底色（分块草地，制造深浅）
-    draw_rect(Rect2(Vector2.ZERO, WORLD_SIZE), Palette.GRASS, true)
-    draw_rect(Rect2(0, 0, WORLD_SIZE.x, 520), Palette.GRASS_DEEP, true)
-    draw_rect(Rect2(0, WORLD_SIZE.y - 380, WORLD_SIZE.x, 380), Palette.GRASS_DEEP, true)
-    # 小径
-    var path_pts := PackedVector2Array([
-        Vector2(0, 820), Vector2(500, 780), Vector2(1000, 830), Vector2(1500, 760),
-        Vector2(2000, 820), Vector2(WORLD_SIZE.x, 780),
-    ])
-    for i in range(path_pts.size() - 1):
-        draw_line(path_pts[i], path_pts[i + 1], Palette.PATH_DEEP, 74.0, true)
-    for i in range(path_pts.size() - 1):
-        draw_line(path_pts[i], path_pts[i + 1], Palette.PATH, 64.0, true)
-    # 丁字路
-    draw_line(Vector2(1180, 830), Vector2(1180, 1180), Palette.PATH_DEEP, 64.0, true)
-    draw_line(Vector2(1180, 830), Vector2(1180, 1180), Palette.PATH, 54.0, true)
-
-    # 草簇
-    var t := Time.get_ticks_msec() / 1000.0
-    for g in _grass_tufts:
-        var p: Vector2 = g["pos"]
-        var sway := sin(t * 1.3 + float(g["sway"])) * 1.4
-        draw_line(p, p + Vector2(sway, -float(g["h"])), 
-            Palette.GRASS_DARK.lerp(Palette.LEAF, float(g["tint"])), 2.0, true)
-
-    # 装饰已拆成 WorldDeco 子节点由 y-sort 绘制
-    # 世界边界
+    # 地面（草地 / 土路 / 池塘）已经是 ground_base.png，由 _build_ground()
+    # 作为 Sprite2D 画在最底层；草簇也烘焙进了那张底图。
+    # 这里唯一还要画的是世界边框。
     draw_rect(Rect2(Vector2(4, 4), WORLD_SIZE - Vector2(8, 8)),
         Palette.LEAF_DEEP, false, 6.0)
-
-# —— 交互 ——
 
 func _on_interact() -> void:
     if _journal != null and _journal.is_open():
