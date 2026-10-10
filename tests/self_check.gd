@@ -9,6 +9,7 @@ var _fail := 0
 func _ready() -> void:
     await get_tree().process_frame
     _check_data()
+    _check_elements()
     _check_state()
     _check_battle_math()
     _check_turn_order()
@@ -40,6 +41,15 @@ func _check_data() -> void:
     _ok(SkillDB.get_skill("bubble")["name"] == "泡泡弹", "技能表可查")
     _ok(SkillDB.get_skill("__nope__")["name"] == "团子撞击", "未知技能回退到撞击")
     _ok(ItemDB.get_item("berry")["name"] == "甜浆果", "道具表可查")
+
+func _check_elements() -> void:
+    print("[属性克制]")
+    _ok(ElementDB.ELEMENTS.size() == 3, "属性表含 3 种属性")
+    _ok(ElementDB.effectiveness("草", "水") == 2.0, "草打水 2 倍")
+    _ok(ElementDB.effectiveness("水", "草") == 0.5, "水打草 0.5 倍")
+    _ok(ElementDB.effectiveness("草", "草") == 1.0, "同属性 1 倍")
+    _ok(ElementDB.effectiveness("星", "草") == 2.0, "星打草 2 倍")
+    _ok(ElementDB.effectiveness("__未知__", "草") == 1.0, "未知属性回退 1 倍")
 
 func _check_state() -> void:
     print("[存档]")
