@@ -7,10 +7,19 @@ var can_move := true
 
 func _ready() -> void:
     is_player = true
-    body_color = Palette.TUANZI
-    edge_color = Palette.TUANZI_EDGE
-    horn_color = Palette.LEAF
+    var c := GameState.appearance_colors()
+    body_color = Color(String(c["body"]))
+    edge_color = Color(String(c["edge"]))
+    horn_color = Color(String(c["horn"]))
     super._ready()
+
+## 切换配色后由 world 调用，立刻刷新外观。
+func apply_appearance() -> void:
+    var c := GameState.appearance_colors()
+    body_color = Color(String(c["body"]))
+    edge_color = Color(String(c["edge"]))
+    horn_color = Color(String(c["horn"]))
+    queue_redraw()
 
 func _physics_process(delta: float) -> void:
     if can_move:

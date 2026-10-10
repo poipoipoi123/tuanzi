@@ -3,6 +3,15 @@ extends Node
 
 # 存档路径由 SavePaths 动态解析（便携优先、自动回退）
 
+## 外观配色预设：body / edge / horn 三个通道（HEX 字符串，便于存进 JSON 存档）。
+const APPEARANCE_PRESETS := {
+    "classic": { "name": "经典白", "body": "fff6e8", "edge": "e8b48a", "horn": "6fbf5f" },
+    "mint":    { "name": "薄荷绿", "body": "d8f5d0", "edge": "8fce80", "horn": "4f9d46" },
+    "sakura":  { "name": "樱花粉", "body": "ffe0e6", "edge": "f0a8b8", "horn": "e07f8c" },
+    "sky":     { "name": "晴空蓝", "body": "dcefff", "edge": "9ec9f0", "horn": "7fb3e0" },
+    "honey":   { "name": "蜂蜜黄", "body": "fff3d0", "edge": "e8c86a", "horn": "d9b24e" },
+}
+
 signal state_changed
 signal item_gained(item_id: String, count: int)
 signal level_up(new_level: int)
@@ -28,6 +37,7 @@ var pet_state := {}             # 伙伴团子兽状态：{ id: {level, hp} }
 var seen: Array = []            # 图鉴：已见
 var caught: Array = []          # 图鉴：已收服
 var flags := {}                 # 剧情开关
+var appearance := { "preset": "classic" }   # 外观：{ preset: 预设 id }
 var play_seconds := 0.0
 
 func _ready() -> void:
@@ -93,6 +103,22 @@ func _apply_derived() -> void:
         player["max_hp"] = new_max
         player["hp"] = mini(int(player["hp"]), new_max)
 
+func set_appearance(preset: String) -> bool:
+    if not APPEARANCE_PRESETS.has(preset):
+        return false
+    appearance["preset"] = preset
+    state_changed.emit()
+    return true
+
+func appearance_colors() -> Dictionary:
+    var p: Dictionary = APPEARANCE_PRESETS.get(
+        String(appearance.get("preset", "classic")), APPEARANCE_PRESETS["classic"])
+    return { "body": String(p["body"]), "edge": String(p["edge"]), "horn": String(p["horn"]) }
+
+func appearance_name() -> String:
+    var p: Dictionary = APPEARANCE_PRESETS.get(String(appearance.get("preset", "classic")), {})
+    return String(p.get("name", "经典白"))
+
 func add_item(item_id: String, count: int = 1) -> void:
     if count == 0:
         return
@@ -134,6 +160,7 @@ func to_dict() -> Dictionary:
         "seen": seen.duplicate(),
         "caught": caught.duplicate(),
         "flags": flags.duplicate(true),
+        "appearance": appearance.duplicate(true),
     }
 
 func from_dict(d: Dictionary) -> bool:
@@ -164,6 +191,11 @@ func from_dict(d: Dictionary) -> bool:
     var ps: Variant = d.get("pet_state", {})
     if typeof(ps) == TYPE_DICTIONARY:
         pet_state = (ps as Dictionary).duplicate(true)
+    var ap: Variant = d.get("appearance", {})
+    if typeof(ap) == TYPE_DICTIONARY and (ap as Dictionary).has("preset"):
+        var pid_ap := String((ap as Dictionary)["preset"])
+        if APPEARANCE_PRESETS.has(pid_ap):
+            appearance["preset"] = pid_ap
     _ensure_pet_state()
     state_changed.emit()
     return true
@@ -248,6 +280,7 @@ func new_game() -> void:
     caught = []
     flags = {}
     play_seconds = 0.0
+    appearance = { "preset": "classic" }
     pet_state = {}
     _ensure_pet_state()
     state_changed.emit()

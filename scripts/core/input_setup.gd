@@ -9,6 +9,7 @@ const ACTIONS := {
     "interact":   [KEY_E, KEY_SPACE, KEY_ENTER],
     "cancel":     [KEY_ESCAPE, KEY_X],
     "menu":       [KEY_TAB, KEY_M],
+    "appearance": [KEY_C],
     "sprint":     [KEY_SHIFT],
     "debug_save": [KEY_F5],
 }

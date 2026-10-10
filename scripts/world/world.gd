@@ -14,6 +14,7 @@ var _lamp_glow := 0.0
 var _obstacles := []            # 阻挡椭圆 { center: Vector2, radii: Vector2 }
 var _npc_bubble: Node = null
 var _journal: CanvasLayer = null
+var _appearance: CanvasLayer = null
 
 func _ready() -> void:
     _build_decor()
@@ -139,12 +140,22 @@ func _setup_ui() -> void:
     _journal = preload("res://scripts/ui/journal.gd").new()
     _journal.name = "Journal"
     add_child(_journal)
+    _appearance = preload("res://scripts/ui/appearance_panel.gd").new()
+    _appearance.name = "Appearance"
+    add_child(_appearance)
+    _appearance.player_ref = player
 
 func _unhandled_input(e: InputEvent) -> void:
     if _journal == null:
         return
     if e.is_action_pressed("menu"):
         _journal.toggle()
+        get_viewport().set_input_as_handled()
+    elif e.is_action_pressed("appearance"):
+        _appearance.toggle()
+        get_viewport().set_input_as_handled()
+    elif e.is_action_pressed("cancel") and _appearance.is_open():
+        _appearance.close()
         get_viewport().set_input_as_handled()
     elif e.is_action_pressed("cancel") and _journal.is_open():
         _journal.close()
@@ -236,6 +247,9 @@ func _draw() -> void:
 func _on_interact() -> void:
     if _journal != null and _journal.is_open():
         _journal.close()
+        return
+    if _appearance != null and _appearance.is_open():
+        _appearance.close()
         return
     if player == null:
         return

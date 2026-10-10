@@ -18,6 +18,7 @@ func _ready() -> void:
     await _check_battle_scene()
     await _check_battle_items()
     _check_growth()
+    _check_appearance()
     print("=== 自检结果：%d 通过 / %d 失败 ===" % [_pass, _fail])
     if _fail > 0:
         get_tree().quit(1)
@@ -300,4 +301,22 @@ func _check_growth() -> void:
     GameState.gain_exp(500)
     _ok(GameState.free_points() > 0, "升级后获得可分配点数")
     _ok(GameState.spend_point("str"), "可分配一点力量")
+
+func _check_appearance() -> void:
+    print("[外貌]")
+    _ok(GameState.APPEARANCE_PRESETS.size() >= 4, "提供至少 4 套配色预设")
+    GameState.new_game()
+    var first: String = GameState.appearance["preset"]
+    _ok(first != "", "默认外观有预设名")
+    var ok := GameState.set_appearance("mint")
+    _ok(ok, "切换到已存在的预设")
+    _ok(String(GameState.appearance["preset"]) == "mint", "外观预设已保存")
+    _ok(not GameState.set_appearance("__不存在__"), "未知预设被拒绝")
+    var cols: Dictionary = GameState.appearance_colors()
+    _ok(cols.has("body") and cols.has("edge") and cols.has("horn"), "配色包含三个通道")
+    GameState.save_game()
+    GameState.new_game()
+    _ok(GameState.load_game(), "存档含外观可读回")
+    _ok(String(GameState.appearance["preset"]) == "mint", "读档还原外观预设")
+
 
