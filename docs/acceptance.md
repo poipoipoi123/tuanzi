@@ -47,7 +47,7 @@
 - [ ] **优雅回退（重点）**：把 `assets/tiles/tileset.png` 临时改名后重跑自检，
       仍应 `=== 自检结果：137 通过 / 0 失败 ===` 且 `ALL PASS`；改回文件名后同样全绿
 - [ ] 贴图存在时团子兽 / NPC / 场景装饰显示为贴图；删除 `assets/sprites/` 下贴图后显示为程序化绘制
-- [ ] `build/Tuanzi.exe` 导出成功并可启动，无报错
+- [ ] `build/Tuanzi.exe` 导出成功（110,696,624 字节）并可启动，无报错
 
 ## 阶段二素材补充 · 门禁实测结果（自动执行日期 2026-06-14）
 
@@ -60,7 +60,8 @@
 | 自检全绿 | `--headless --path . res://tests/self_check.tscn --quit-after 900` | `=== 自检结果：137 通过 / 0 失败 ===` + `ALL PASS`，退出码 0 |
 | stderr 洁净 | 合并 stdout+stderr 后 grep | 无 `SCRIPT ERROR` / `Parse Error` / `Compile Error` |
 | 缺图优雅回退 | 临时改名 `assets/tiles/tileset.png` 后重跑自检 | 仍 137/0 + `ALL PASS`，退出码 0 |
-| 导出并启动 | `--headless --export-release "Windows Desktop" build/Tuanzi.exe` | 导出 111,583,296 字节；启动后存活 12 秒，无报错输出 |
+| 缺整目录回退 | 临时改名整个 `assets/sprites/` 目录后重跑自检 | 仍 137/0 + `ALL PASS`，退出码 0 |
+| 导出并启动 | `--headless --export-release "Windows Desktop" build/Tuanzi.exe` | 导出 110,696,624 字节；启动后存活 14 秒，无 ERROR/SCRIPT ERROR 输出 |
 | 素材许可 | 逐包读取 `License.txt` + 逐页核对 OpenGameArt 许可区块 | Kenney 10 包全 CC0 1.0；OpenGameArt 12 项全 CC0 1.0；无 SA/NC/ND/OGA-BY |
 | 打包体积 | `assets/_originals`、`_source_pages`、`_pages` 内放 `.gdignore` | 归档 4.78 MB 不进包；运行期 `sprites/`+`tiles/`+`ui/` 共 2.21 MB / 2446 文件 |
 
