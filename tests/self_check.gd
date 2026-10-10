@@ -17,6 +17,7 @@ func _ready() -> void:
     await _check_world()
     await _check_battle_scene()
     await _check_battle_items()
+    _check_growth()
     print("=== 自检结果：%d 通过 / %d 失败 ===" % [_pass, _fail])
     if _fail > 0:
         get_tree().quit(1)
@@ -264,3 +265,39 @@ func _check_battle_items() -> void:
     _ok(b.state in ["act", "result"], "收服尝试推进了战斗状态")
     b.queue_free()
     await get_tree().process_frame
+
+func _check_growth() -> void:
+    print("[养成]")
+    _ok(Growth.ATTRS.size() == 4, "四维属性定义完整")
+    _ok(Growth.points_for_level(1) == 0, "1 级无可用点数")
+    _ok(Growth.points_for_level(5) > 0, "升级获得点数")
+    # --- 偏离计划原断言（见下方长注释）---
+    # 计划原断言为：spend({str:1,...}, "str", 3) -> points == 2，
+    # 与随后的 spend(同一字典, "str", 99) -> points == 0 互相矛盾
+    # （同一入参不可能既返回 2 又返回 0），且计划实现体恒返回 points = 0。
+    # 本仓库采用的契约：spend(attrs, attr, count, available = -1)
+    #   available >= 0：受点数上限约束，只加 min(count, available) 点，
+    #                  返回 {"attrs":…, "points": 剩余可用点数}
+    #   available < 0 ：不限点数，全部加上，points 回显 count（被扣除的点数）
+    var unlimited := Growth.spend({"str": 1, "vit": 1, "agi": 1, "int": 1}, "str", 3)
+    _ok(int(unlimited["attrs"]["str"]) == 4, "加点生效")
+    _ok(int(unlimited["points"]) == 3, "点数被扣除")
+    # 点数不足：可用 2 点，请求 99 点 → 只加 2，剩余归零
+    var over := Growth.spend({"str": 1, "vit": 1, "agi": 1, "int": 1}, "str", 99, 2)
+    _ok(int(over["attrs"]["str"]) == 3, "点数不足时只加剩余部分")
+    _ok(int(over["points"]) == 0, "点数归零")
+    # 点数不足但未耗尽：可用 5 点，请求 2 点 → 加 2，剩 3
+    var partial := Growth.spend({"str": 1, "vit": 1, "agi": 1, "int": 1}, "str", 2, 5)
+    _ok(int(partial["attrs"]["str"]) == 3 and int(partial["points"]) == 3,
+        "余量正确回显（加 2 点剩 3 点）")
+    _ok(Growth.stat_bonus(10, "str") > Growth.stat_bonus(0, "str"), "点数提升属性收益")
+    GameState.new_game()
+    _ok(GameState.player.has("attrs"), "存档含四维属性")
+    _ok(GameState.free_points() >= 0, "可用点数非负")
+    # 偏离计划原断言：计划在 new_game()（即 Lv.1，free_points()==0）后直接期望
+    # spend_point("str") 成功，与它自己的 "1 级无可用点数" 断言冲突。
+    # 这里先升级拿到点数再分配，保持断言语义正确。
+    GameState.gain_exp(500)
+    _ok(GameState.free_points() > 0, "升级后获得可分配点数")
+    _ok(GameState.spend_point("str"), "可分配一点力量")
+

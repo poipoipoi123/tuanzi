@@ -18,6 +18,8 @@ var player := {
     "spd": 10,
     "coins": 120,
     "star_dust": 3,
+    "attrs": { "str": 0, "vit": 0, "agi": 0, "int": 0 },
+    "spent_points": 0,
 }
 
 var inventory := { "berry": 3, "honey": 1 }
@@ -62,6 +64,34 @@ func gain_exp(amount: int) -> void:
         level_up.emit(int(player["level"]))
         guard += 1
     state_changed.emit()
+
+## 当前可分配点数 = 升级应得 - 已花费
+func free_points() -> int:
+    return maxi(0, Growth.points_for_level(int(player["level"]))
+        - int(player.get("spent_points", 0)))
+
+## 分配一点属性，并按四维重算战斗数值。
+func spend_point(attr: String) -> bool:
+    if free_points() <= 0 or not Growth.ATTRS.has(attr):
+        return false
+    var attrs: Dictionary = player.get("attrs", {})
+    var res: Dictionary = Growth.spend(attrs, attr, 1, free_points())
+    player["attrs"] = res["attrs"]
+    player["spent_points"] = int(player.get("spent_points", 0)) + 1
+    _apply_derived()
+    state_changed.emit()
+    return true
+
+## 用四维属性覆盖派生数值（不碰当前血量上限以外的字段）。
+func _apply_derived() -> void:
+    var d: Dictionary = Growth.derive_at(player.get("attrs", {}), int(player["level"]))
+    player["atk"] = int(d["atk"])
+    player["def"] = int(d["def"])
+    player["spd"] = int(d["spd"])
+    var new_max := int(d["max_hp"])
+    if new_max != int(player["max_hp"]):
+        player["max_hp"] = new_max
+        player["hp"] = mini(int(player["hp"]), new_max)
 
 func add_item(item_id: String, count: int = 1) -> void:
     if count == 0:
@@ -116,6 +146,11 @@ func from_dict(d: Dictionary) -> bool:
         if p.has(k):
             player[k] = p[k]
     player["hp"] = clampi(int(player["hp"]), 0, int(player["max_hp"]))
+    if not player.has("attrs"):
+        player["attrs"] = { "str": 0, "vit": 0, "agi": 0, "int": 0 }
+    if not player.has("spent_points"):
+        player["spent_points"] = 0
+    _apply_derived()
     var inv: Variant = d.get("inventory", {})
     if typeof(inv) == TYPE_DICTIONARY:
         inventory = (inv as Dictionary).duplicate(true)
@@ -204,6 +239,8 @@ func new_game() -> void:
     player = {
         "name": "小团子", "level": 1, "exp": 0, "hp": 60, "max_hp": 60,
         "atk": 12, "def": 10, "spd": 10, "coins": 120, "star_dust": 3,
+        "attrs": { "str": 0, "vit": 0, "agi": 0, "int": 0 },
+        "spent_points": 0,
     }
     inventory = { "berry": 3, "honey": 1 }
     party = ["grass"]
