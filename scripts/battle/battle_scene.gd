@@ -67,6 +67,8 @@ func _ready() -> void:
     add_child(_menu)
     _menu.skill_chosen.connect(_on_skill_chosen)
     _menu.flee_chosen.connect(_on_flee)
+    _menu.item_menu_requested.connect(_on_item_menu)
+    _menu.capture_requested.connect(_on_capture_menu)
     state = "intro"
     if _timer <= 0.0:
         _timer = 1.0
@@ -164,6 +166,86 @@ func _on_flee() -> void:
         _apply(1, sk)
         state = "act"
         _timer = 0.75
+
+## 使用背包道具（战斗中）。只处理 heal / buff 两类。
+func _on_item_used(item_id: String) -> void:
+    if state != "choose":
+        return
+    var it: Dictionary = ItemDB.get_item(item_id)
+    if it.is_empty() or not GameState.consume_item(item_id):
+        _push_log("没有可用的 %s。" % ItemDB.get_item(item_id).get("name", item_id))
+        return
+    _menu.visible = false
+    match String(it.get("type", "")):
+        "heal":
+            var h := ally.heal(int(it["power"]))
+            _push_log("使用 %s，%s 恢复了 %d 点体力。" % [it["name"], ally.data["name"], h])
+            _add_floater(0, "+%d" % h, Palette.HP_GREEN)
+        "buff":
+            ally.data["atk"] = int(ally.data["atk"]) + int(it["power"])
+            _push_log("使用 %s，攻击提升 %d 点。" % [it["name"], int(it["power"])])
+        _:
+            _push_log("%s 在这里派不上用场。" % it["name"])
+    _queue = _build_queue("tackle")
+    _queue.pop_front()          # 用道具消耗本回合行动
+    state = "act"
+    _timer = 0.6
+
+## 尝试收服当前野生团子兽。
+func _on_capture_attempt(item_id: String) -> void:
+    if state != "choose":
+        return
+    if not GameState.consume_item(item_id):
+        _push_log("没有 %s 了。" % item_id)
+        return
+    _menu.visible = false
+    var it: Dictionary = ItemDB.get_item(item_id)
+    var ball_power := int(it.get("power", 1))
+    var gap := float(ally.data["level"]) - float(foe.data["level"])
+    var ok := Capture.attempt(foe.hp_ratio(), ball_power, maxf(0.0, gap) * 0.05, _rng.randf())
+    if ok:
+        _push_log("成功收服了 %s！" % foe.data["name"])
+        var pid := String(foe.data["id"])
+        if not GameState.party.has(pid):
+            GameState.party.append(pid)
+        GameState.pet_state[pid] = { "level": int(foe.data["level"]), "hp": int(foe.data["hp"]) }
+        GameState.mark_seen(pid)
+        _result = "win"
+        GameState.save_game()
+        state = "result"
+        _timer = 1.4
+    else:
+        _push_log("%s 挣脱了！" % foe.data["name"])
+        var ids := foe.skill_ids()
+        _apply(1, SkillDB.get_skill(String(ids[_rng.randi() % ids.size()])))
+        state = "act"
+        _timer = 0.75
+
+## 找出背包里第一个指定类型的可用道具 id。
+func _first_item_of_type(t: String) -> String:
+    for iid in GameState.inventory.keys():
+        var it: Dictionary = ItemDB.get_item(String(iid))
+        if String(it.get("type", "")) == t and int(GameState.inventory[iid]) > 0:
+            return String(iid)
+    return ""
+
+## 道具按钮：优先回复类，其次增益类。
+func _on_item_menu() -> void:
+    var iid := _first_item_of_type("heal")
+    if iid == "":
+        iid = _first_item_of_type("buff")
+    if iid == "":
+        _push_log("背包里没有可用的道具。")
+        return
+    _on_item_used(iid)
+
+## 收服按钮：投掷第一个捕捉类道具。
+func _on_capture_menu() -> void:
+    var iid := _first_item_of_type("capture")
+    if iid == "":
+        _push_log("没有捕捉道具，去商店看看吧。")
+        return
+    _on_capture_attempt(iid)
 
 func _step_queue() -> void:
     if not ally.is_alive() or not foe.is_alive():

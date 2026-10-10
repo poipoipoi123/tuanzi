@@ -2,6 +2,8 @@ extends Control
 ## 战斗指令菜单：技能按钮（按当前伙伴技能表动态生成）+ 逃跑。
 
 signal skill_chosen(skill_id: String)
+signal item_menu_requested()
+signal capture_requested()
 signal flee_chosen()
 
 var _hb: HBoxContainer
@@ -40,6 +42,8 @@ func refresh_for(battler: Battler) -> void:
         _hb.add_child(_make_button(
             "%s\n威力 %d" % [sk["name"], int(sk.get("power", 0))],
             Palette.PINK_DEEP, func(): skill_chosen.emit(String(sid))))
+    _hb.add_child(_make_button("道具", Palette.MINT.darkened(0.3), func(): item_menu_requested.emit()))
+    _hb.add_child(_make_button("收服", Palette.SKY.darkened(0.2), func(): capture_requested.emit()))
     _hb.add_child(_make_button("逃跑", Palette.INK_SOFT, func(): flee_chosen.emit()))
 
 func _make_button(text: String, edge: Color, cb: Callable) -> Button:

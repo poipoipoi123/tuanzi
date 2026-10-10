@@ -16,6 +16,7 @@ func _ready() -> void:
     _check_turn_order()
     await _check_world()
     await _check_battle_scene()
+    await _check_battle_items()
     print("=== 自检结果：%d 通过 / %d 失败 ===" % [_pass, _fail])
     if _fail > 0:
         get_tree().quit(1)
@@ -228,5 +229,38 @@ func _check_battle_scene() -> void:
     var foe_hp_dropped: bool = int(b.foe.data["hp"]) < hp_before or not b.foe.is_alive()
     _ok(foe_hp_dropped, "敌方受到过伤害")
     _ok(b.foe.data["hp"] >= 0, "敌方血量不为负")
+    b.queue_free()
+    await get_tree().process_frame
+
+func _check_battle_items() -> void:
+    print("[战斗道具]")
+    var b: Node2D = load("res://scripts/battle/battle_scene.gd").new()
+    add_child(b)
+    b.setup("grass", 3, "grass", 3)
+    await get_tree().process_frame
+    GameState.new_game()
+    GameState.add_item("berry", 2)
+    var berry_before := int(GameState.inventory.get("berry", 0))
+
+    # 使用回复道具应回血并消耗道具
+    b.ally.data["hp"] = 5
+    b.state = "choose"
+    b._on_item_used("berry")
+    _ok(int(b.ally.data["hp"]) > 5, "道具回复了体力")
+    _ok(int(GameState.inventory.get("berry", 0)) == berry_before - 1, "道具被消耗")
+
+    # 无道具时不应生效
+    b.state = "choose"
+    var hp_before := int(b.ally.data["hp"])
+    GameState.add_item("berry", -99)
+    b._on_item_used("berry")
+    _ok(int(b.ally.data["hp"]) == hp_before, "无道具时使用不生效")
+
+    # 收服会结束战斗
+    GameState.add_item("capture_ball", 5)
+    b.foe.data["hp"] = 1
+    b.state = "choose"
+    b._on_capture_attempt("capture_ball")
+    _ok(b.state in ["act", "result"], "收服尝试推进了战斗状态")
     b.queue_free()
     await get_tree().process_frame
