@@ -1,7 +1,23 @@
 class_name TuanziArt
 extends RefCounted
-## 团子角色程序化绘制库。所有美术均为代码原创，不加载任何外部图片。
+## 团子角色绘制库。优先使用开源像素贴图；贴图缺失时回退到程序化绘制。
 ## 复用者：玩家、NPC、战斗单位、图鉴。
+
+## 团子兽 id -> 贴图路径。素材缺失时 load_tex 返回 null，绘制自动回退程序化。
+const SPRITE_FOR := {
+    "grass": "res://assets/sprites/tuanzi_grass.png",
+    "water": "res://assets/sprites/tuanzi_water.png",
+    "spark": "res://assets/sprites/tuanzi_spark.png",
+}
+
+static func sprite_path_for(pet_id: String) -> String:
+    return String(SPRITE_FOR.get(pet_id, "res://assets/sprites/tuanzi_missing.png"))
+
+static func has_sprite(pet_id: String) -> bool:
+    return SpriteLib.load_tex(sprite_path_for(pet_id)) != null
+
+static func sprite_for(pet_id: String) -> Texture2D:
+    return SpriteLib.load_tex(sprite_path_for(pet_id))
 
 # —— 基础图元 ——
 
@@ -77,42 +93,52 @@ static func draw_tuanzi(canvas: CanvasItem, origin: Vector2, state: Dictionary) 
     var edge: Color = state.get("edge", Palette.TUANZI_EDGE)
     var horn: Color = state.get("horn", Palette.LEAF)
 
-    # 呼吸：整体轻微纵向缩放
-    var breathe := 1.0 + sin(phase * TAU) * 0.022
-    var squash := Vector2(1.0 / breathe, breathe)
+    # —— 贴图优先，缺图时优雅回退到下方程序化绘制 ——
+    var pet_id := String(state.get("pet_id", ""))
+    var tex := sprite_for(pet_id)
+    if tex != null:
+        var px := 56.0 * s
+        canvas.draw_texture_rect(tex, Rect2(-px / 2.0, origin.y - px, px, px), false)
+        return
+    else:
+        # —— 以下为原有程序化绘制，原样保留 ——
+        # 呼吸：整体轻微纵向缩放
+        var breathe := 1.0 + sin(phase * TAU) * 0.022
+        var squash := Vector2(1.0 / breathe, breathe)
 
-    var body_r := Vector2(26.0, 23.0) * s
-    var body_c := origin + Vector2(0, -30.0 * s + bob)
+        var body_r := Vector2(26.0, 23.0) * s
+        var body_c := origin + Vector2(0, -30.0 * s + bob)
 
-    # 1) 落地阴影（跟随浮动收缩）
-    ground_shadow(canvas, origin + Vector2(0, 2.0 * s),
-        body_r.x * (1.0 - absf(bob) / (40.0 * s) * 2.2), 0.16)
+        # 1) 落地阴影（跟随浮动收缩）
+        ground_shadow(canvas, origin + Vector2(0, 2.0 * s),
+            body_r.x * (1.0 - absf(bob) / (40.0 * s) * 2.2), 0.16)
 
-    # 2) 双脚
-    var foot_y := origin.y - 3.0 * s
-    var swing := sin(leg) * 7.0 * s
-    paw(canvas, Vector2(origin.x - 11.0 * s + swing, foot_y), 9.0 * s, body, edge)
-    paw(canvas, Vector2(origin.x + 11.0 * s - swing, foot_y), 9.0 * s, body, edge)
+        # 2) 双脚
+        var foot_y := origin.y - 3.0 * s
+        var swing := sin(leg) * 7.0 * s
+        paw(canvas, Vector2(origin.x - 11.0 * s + swing, foot_y), 9.0 * s, body, edge)
+        paw(canvas, Vector2(origin.x + 11.0 * s - swing, foot_y), 9.0 * s, body, edge)
 
-    # 3) 身体（上色 + 描边 + 高光）
-    var r_scaled := Vector2(body_r.x * squash.x, body_r.y * squash.y)
-    ellipse_outlined(canvas, body_c, r_scaled, body, edge, 2.4 * s)
-    ellipse(canvas, body_c + Vector2(0, -r_scaled.y * 0.30),
-        Vector2(r_scaled.x * 0.98, r_scaled.y * 0.62),
-        body.lightened(0.06))
-    ellipse_shine(canvas, body_c, r_scaled, 0.55)
+        # 3) 身体（上色 + 描边 + 高光）
+        var r_scaled := Vector2(body_r.x * squash.x, body_r.y * squash.y)
+        ellipse_outlined(canvas, body_c, r_scaled, body, edge, 2.4 * s)
+        ellipse(canvas, body_c + Vector2(0, -r_scaled.y * 0.30),
+            Vector2(r_scaled.x * 0.98, r_scaled.y * 0.62),
+            body.lightened(0.06))
+        ellipse_shine(canvas, body_c, r_scaled, 0.55)
 
-    # 4) 脸
-    var face_c := body_c + Vector2(0, -r_scaled.y * 0.06)
-    _draw_face(canvas, face_c, s, facing, blink, mouth, hurt)
+        # 4) 脸
+        var face_c := body_c + Vector2(0, -r_scaled.y * 0.06)
+        _draw_face(canvas, face_c, s, facing, blink, mouth, hurt)
 
-    # 5) 头顶嫩芽
-    leaf(canvas, body_c + Vector2(-1.0 * s, -r_scaled.y * 0.92),
-        20.0 * s, facing * 0.5 + sin(phase * TAU) * 0.18, horn, horn.darkened(0.30))
+        # 5) 头顶嫩芽
+        leaf(canvas, body_c + Vector2(-1.0 * s, -r_scaled.y * 0.92),
+            20.0 * s, facing * 0.5 + sin(phase * TAU) * 0.18, horn, horn.darkened(0.30))
 
-    # 6) 小手（朝向侧前方）
-    var arm_x := body_c.x + facing * r_scaled.x * 0.92
-    paw(canvas, Vector2(arm_x, body_c.y + 3.0 * s), 6.2 * s, body, edge)
+        # 6) 小手（朝向侧前方）
+        var arm_x := body_c.x + facing * r_scaled.x * 0.92
+        paw(canvas, Vector2(arm_x, body_c.y + 3.0 * s), 6.2 * s, body, edge)
+
 
 static func _draw_face(canvas: CanvasItem, face_c: Vector2, s: float, facing: float,
         blink: float, mouth: float, hurt: float) -> void:

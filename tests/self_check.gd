@@ -10,6 +10,7 @@ func _ready() -> void:
     await get_tree().process_frame
     _check_data()
     _check_sprite_lib()
+    _check_sprite_art()
     _check_elements()
     _check_capture()
     _check_state()
@@ -63,6 +64,20 @@ func _check_sprite_lib() -> void:
     _ok(SpriteLib.load_tex("res://icon.svg") == icon, "重复加载命中缓存返回同一实例")
     SpriteLib.clear_cache()
     _ok(true, "清缓存不报错")
+
+func _check_sprite_art() -> void:
+    print("[贴图美术]")
+    var t := SpriteLib.load_tex(TuanziArt.SPRITE_FOR["grass"])
+    _ok(t == null or t is Texture2D, "grass 贴图路径可安全查询")
+    var fallback_ok := TuanziArt.has_sprite("grass")
+    _ok(fallback_ok == TuanziArt.has_sprite("water"), "各团子兽查询行为一致")
+    _ok(not TuanziArt.has_sprite("__不存在__"), "未知团子兽报告无贴图")
+    var d := TuanziArt.sprite_path_for("spark")
+    _ok(d.ends_with(".png"), "贴图路径后缀为 png：%s" % d)
+    # 计划的任务 C 测试块只列出 4 条断言，但其算术按 5 条计（121+5=126）。
+    # 此处补测未知 id 的路径回退契约：必须落到缺失占位图而不是空串。
+    _ok(TuanziArt.sprite_path_for("__不存在__") ==
+        "res://assets/sprites/tuanzi_missing.png", "未知 id 回退到缺失占位路径")
 
 func _check_elements() -> void:
     print("[属性克制]")
