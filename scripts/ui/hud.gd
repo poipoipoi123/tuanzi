@@ -52,7 +52,7 @@ func _ready() -> void:
     _hint.add_theme_color_override("font_color", Palette.INK_SOFT)
     _hint.add_theme_color_override("font_outline_color", Color(1, 1, 1, 0.9))
     _hint.add_theme_constant_override("outline_size", 4)
-    _hint.text = "WASD / 方向键 移动    E / 空格 交互    F5 存档    Tab 图鉴"
+    _hint.text = "WASD / 方向键 移动    E / 空格 交互    F5 存档    F9 读档    Tab 图鉴"
     root.add_child(_hint)
 
     _toast = Label.new()

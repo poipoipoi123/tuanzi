@@ -8,7 +8,8 @@ const WORLD_SIZE := Vector2(2400, 1600)
 var player: Actor
 var camera: Camera2D
 var npcs: Array = []
-var _deco_static := []      # 静态装饰（树/房/栅栏）
+var _deco_static := []      # 静态装饰（树/房/栅栏）配置；_build_decor 后转为 _deco_nodes
+var _deco_nodes: Array = []   # 对应的 WorldDeco 子节点（参与 y-sort）
 var _grass_tufts := []
 var _lamp_glow := 0.0
 var _obstacles := []            # 阻挡椭圆 { center: Vector2, radii: Vector2 }
@@ -18,6 +19,11 @@ var _appearance: CanvasLayer = null
 var _step_cd := 0.0
 
 func _ready() -> void:
+    # y-sort：让树/房/栅栏与 player、NPC 按 y 正确前后遮挡。
+    # Godot 的 y_sort 只在父子节点之间生效，而装饰是 world._draw() 里
+    # 手绘的普通数组（_deco_static），永远先于子节点绘制 —— 角色会
+    # 从树后面直接穿过去显示。开启 y_sort 后装饰需改为真实子节点。
+    y_sort_enabled = true
     _build_decor()
     _spawn_player()
     _spawn_npcs()
@@ -80,6 +86,36 @@ func _build_decor() -> void:
     _deco_static.append({ "kind": "fence", "from": Vector2(1600, 300), "to": Vector2(1600, 460) })
     _deco_static.append({ "kind": "fence", "from": Vector2(900, 1250), "to": Vector2(900, 1420) })
     _deco_static.append({ "kind": "fence", "from": Vector2(900, 1420), "to": Vector2(1140, 1420) })
+
+    # 装饰必须成为真实子节点才能参与 y-sort（见 WorldDeco 顶部说明）。
+    _spawn_deco_nodes()
+
+## 把 _deco_static 里的每一项实例化成 WorldDeco 子节点。
+## world 自身只保留地面、小径与草簇（地面永远在最底，装饰与角色的前后关系
+## 完全交给 y_sort 处理）。
+func _spawn_deco_nodes() -> void:
+    # _deco_static 保留为配置来源（自检会断言装饰数量），不再被清空。
+    for i in _deco_static.size():
+        var d: Dictionary = _deco_static[i]
+        var node := WorldDeco.new()
+        var py: float = 0.0
+        if d.has("pos"):
+            py = float((d["pos"] as Vector2).y)
+        elif d.has("from"):
+            py = maxf(float((d["from"] as Vector2).y), float((d["to"] as Vector2).y))
+        node.sort_y = py
+        node.position = Vector2(0, py)
+        # 绘制改用局部坐标（以自身 y 为原点），z_index 仍按世界 y 设置，
+        # 于是「z 序 = 世界 y 序」，与 player 的 z_index=int(position.y) 对齐。
+        node.spec = d.duplicate(true)
+        if d.has("pos"):
+            node.spec["pos"] = (d["pos"] as Vector2) - Vector2(0, py)
+        if d.has("from"):
+            node.spec["from"] = (d["from"] as Vector2) - Vector2(0, py)
+            node.spec["to"] = (d["to"] as Vector2) - Vector2(0, py)
+        node.name = "Deco_%s_%d" % [String(d["kind"]), i]
+        add_child(node)
+        _deco_nodes.append(node)
 
 func _spawn_player() -> void:
     player = preload("res://scripts/world/player.gd").new()
@@ -225,36 +261,7 @@ func _draw() -> void:
         draw_line(p, p + Vector2(sway, -float(g["h"])), 
             Palette.GRASS_DARK.lerp(Palette.LEAF, float(g["tint"])), 2.0, true)
 
-    # 静态装饰按 y 排序绘制
-    var deco := _deco_static.duplicate()
-    deco.sort_custom(_deco_less)
-    for d in deco:
-        match String(d["kind"]):
-            "pond":
-                WorldArt.pond(self, Vector2(d["pos"]), Vector2(float(d["rx"]), float(d["ry"])))
-            "house":
-                WorldArt.house(self, Vector2(d["pos"]), float(d["w"]), float(d["h"]),
-                    Color(d["wall"]), Color(d["roof"]))
-            "tree":
-                # 贴图优先；tileset 缺失时回退到程序化绘制
-                var tree_tex := SpriteLib.frame(
-                    SpriteLib.load_tex(WorldArt.tile_path("tree")),
-                    WorldArt.TILE_NAMES.find("tree"), WorldArt.TILE_NAMES.size())
-                if tree_tex != null:
-                    var ts := float(d["scale"])
-                    var tp: Vector2 = d["pos"]
-                    var tp_px := float(WorldArt.TILE_PX) * 4.0 * ts
-                    draw_texture_rect(tree_tex,
-                        Rect2(tp.x - tp_px * 0.5, tp.y - tp_px, tp_px, tp_px), false)
-                else:
-                    WorldArt.tree(self, Vector2(d["pos"]), float(d["scale"]),
-                        sin(t * 0.8 + float(d["sway"])) * 0.6)
-            "bush":
-                WorldArt.bush(self, Vector2(d["pos"]), float(d["scale"]))
-            "fence":
-                WorldArt.fence(self, Vector2(d["from"]), Vector2(d["to"]))
-            "lamp":
-                WorldArt.lamp(self, Vector2(d["pos"]), _lamp_glow)
+    # 装饰已拆成 WorldDeco 子节点由 y-sort 绘制
     # 世界边界
     draw_rect(Rect2(Vector2(4, 4), WORLD_SIZE - Vector2(8, 8)),
         Palette.LEAF_DEEP, false, 6.0)

@@ -12,6 +12,9 @@ const ACTIONS := {
     "appearance": [KEY_C],
     "sprint":     [KEY_SHIFT],
     "debug_save": [KEY_F5],
+    # F9：读取存档。此前既没有绑定任何读取键，main.gd 也没有 load_game 调用点，
+    # 所以「关闭后重开进度丢失」是必然结果，不是偶发。
+    "debug_load": [KEY_F9],
 }
 
 func _enter_tree() -> void:

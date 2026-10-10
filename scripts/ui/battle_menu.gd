@@ -7,6 +7,7 @@ signal capture_requested()
 signal flee_chosen()
 
 var _hb: HBoxContainer
+var _panel: PanelContainer
 var cursor := 0
 var _entries: Array = []       # [{ id, kind }]，kind: "skill" | "item" | "capture" | "flee"
 
@@ -16,11 +17,16 @@ func _ready() -> void:
     set_anchors_preset(Control.PRESET_FULL_RECT)
     mouse_filter = Control.MOUSE_FILTER_IGNORE
     var panel := PanelContainer.new()
-    panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-    panel.offset_left = 32
-    panel.offset_top = -196
-    panel.offset_bottom = -108
-    panel.offset_right = 700
+    # 本 Control 挂在 Node2D（battle_scene）下，父级没有矩形面积，
+    # Control 的 anchors 按 parent_area_size=(0,0) 解析，于是
+    # PRESET_BOTTOM_LEFT + offset_top=-196 变成字面上的 y=-196 —— 整排按钮
+    # 被画在屏幕上方外面。这里改用视口绝对像素定位，并随视口尺寸重算。
+    panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+    panel.offset_left = 32.0
+    panel.offset_top = 0.0
+    panel.offset_right = 736.0
+    panel.offset_bottom = 88.0
+    panel.position = _panel_origin()
     var style := StyleBoxFlat.new()
     style.bg_color = Color(Palette.PANEL, 0.97)
     style.border_color = Palette.PANEL_EDGE
@@ -32,9 +38,28 @@ func _ready() -> void:
     style.content_margin_bottom = 10
     panel.add_theme_stylebox_override("panel", style)
     add_child(panel)
+    _panel = panel
+    if not get_viewport().size_changed.is_connected(_layout):
+        get_viewport().size_changed.connect(_layout)
     _hb = HBoxContainer.new()
     _hb.add_theme_constant_override("separation", 10)
     panel.add_child(_hb)
+
+## 面板原点：右下角空位，贴底且右对齐。
+## 左侧要留给战斗日志（battle_scene.gd:439 从 x=40 起画），
+## 中间偏左是我方团子兽的站位（ALLY_ORIGIN=(432,604)），所以贴右边放才不会挡角色。
+const PANEL_SIZE := Vector2(704.0, 88.0)
+const PANEL_MARGIN := 32.0
+
+func _panel_origin() -> Vector2:
+    var vp: Vector2 = get_viewport_rect().size
+    return Vector2(maxf(PANEL_MARGIN, vp.x - PANEL_SIZE.x - PANEL_MARGIN),
+        maxf(0.0, vp.y - PANEL_SIZE.y - 108.0))
+
+## 窗口尺寸变化时把面板拉回可见区域。
+func _layout() -> void:
+    if _panel != null and is_instance_valid(_panel):
+        _panel.position = _panel_origin()
 
 ## 依据出战伙伴的技能表重建按钮。
 func refresh_for(battler: Battler) -> void:

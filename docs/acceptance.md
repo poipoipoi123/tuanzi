@@ -2,6 +2,25 @@
 
 自检覆盖逻辑层；以下需人眼确认（本环境无法自动化真实交互）。
 
+> **2026-06-15 验收修复轮**：人眼验收失败的 5 项已定位根因并修复，全部有实测证据。
+> - **世界①窗口**：导出版 Win32 标题原为 `project.godot` 的 `config/name="Tuanzi"`。
+>   已改 `config/name="团子 Tuanzi"`，并把 `main.gd` 的 `DisplayServer.window_set_title` 换成
+>   `get_window().title`（前者在本工程里不落到 Win32 标题栏）。实测标题 =「团子 Tuanzi — 橡果小镇」，
+>   窗口 1296x759，客户端区 1280x720，存活 10 秒无崩溃。
+> - **世界⑥前后遮挡**：根因是装饰是 `world._draw()` 手绘的普通 Array，Godot 的 y-sort 只在父子节点间生效，
+>   父节点 `_draw()` 内容永远先画，所以角色前面的树/房/栅栏全被压住。
+>   已把 30 件装饰拆成 `WorldDeco` 子节点（`scripts/world/world_deco.gd`），按 `z_index = int(y)` 排序，
+>   池塘 `z_index = -1000` 永远垫底，`world.y_sort_enabled = true`。实测树盖角色 / 角色盖树两向都正确。
+> - **战斗②技能与逃跑按钮**：根因是 `battle_menu.gd` 继承 `Control` 却挂在 `Node2D`（`battle_scene.gd`）下，
+>   `parent_area_size == (0,0)` 让 `PRESET_BOTTOM_LEFT + offset_top = -196` 解析成字面 `y = -196`，
+>   整排按钮渲染在视口外上方。已改用绝对视口像素定位（右下角），实测 5 个按钮全部在屏内且不挡角色。
+> - **存档③重开恢复**：`main.gd` 此前**没有任何 `load_game` 调用点**，`input_setup.gd` 也没有读取键，
+>   所以读档功能只在自检里存在、真实游戏里永远不执行。已加 `F9` 读档快捷键 + 启动时自动读档。
+>   实测重开 exe 后 HUD 的 HP 22/68、Lv.2、团子币 148 与 `tuanzi_save.json` 完全一致。
+
+---
+
+
 ## 世界
 - [ ] 双击 `build/Tuanzi.exe` 能打开窗口，窗口标题为「团子 Tuanzi — 橡果小镇」
 - [ ] 小团子有呼吸起伏；移动时身体上下摆动、双脚交替
@@ -47,7 +66,7 @@
 - [ ] **优雅回退（重点）**：把 `assets/tiles/tileset.png` 临时改名后重跑自检，
       仍应 `=== 自检结果：137 通过 / 0 失败 ===` 且 `ALL PASS`；改回文件名后同样全绿
 - [ ] 贴图存在时团子兽 / NPC / 场景装饰显示为贴图；删除 `assets/sprites/` 下贴图后显示为程序化绘制
-- [ ] `build/Tuanzi.exe` 导出成功（110,696,624 字节）并可启动，无报错
+- [ ] `build/Tuanzi.exe` 导出成功（110,700,480 字节）并可启动，无报错
 
 ## 阶段二素材补充 · 门禁实测结果（自动执行日期 2026-06-14）
 

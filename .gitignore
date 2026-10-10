@@ -10,3 +10,4 @@ tests/saveprobe.*
 tests/diag.*
 tests/deep.*
 tests/probe.gd
+.tmp/
